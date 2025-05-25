@@ -1,20 +1,14 @@
 # ============================================================
-# Magnetic Flux Density (B) and Vector Potential (A) Mapping
-# using FEMM for a SPM Motor (Surface Permanent Magnet)
+# Magnetic Field Mapping - B and A from FEMM Simulation
 #
-# This script runs a magnetic simulation in FEMM for different
-# stator current magnitudes and rotor angles, applying dq-abc 
-# transformations. It records:
-#   - Electromagnetic torque
-#   - Magnetic flux density vector B
-#   - Magnetic vector potential A
-#
-# Results are stored in a .mat file for post-processing (e.g., FFT).
+# This script runs a magnetostatic simulation in FEMM to 
+# extract the magnetic flux density (B) and magnetic vector 
+# potential (A) for a PMSM across different current magnitudes 
+# and rotor positions. Results are stored in a .mat file.
 #
 # Author: Oseias de Paula Ferreira
 # Institution: Universidade Federal de Minas Gerais (UFMG)
 # Date: May 2025
-# Requirements: FEMM, Python 3.x, scipy.io, numpy, matplotlib
 # ============================================================
 
 import femm
@@ -27,66 +21,67 @@ import string
 import scipy.io as sio
 import math
 
-# Motor currents (MotorCAD reference)
-Loc = list(string.ascii_uppercase[0:10])
-iss = [0.1, 0.12, 0.19, 0.31, 0.48, 0.69, 0.94, 1.25, 1.6, 2]
+# -----------------------------
+# Input Data - Currents
+# -----------------------------
+iss = [10, 12.96, 21.85, 36.67, 57.41, 84.07, 116.67, 155.19, 199.63, 250]  # [A]
 
-# Open FEMM and prepare geometry
+# Open FEMM and load the model
 femm.openfemm(1)
-femm.opendocument('my_SPM_motor_AGB.FEM')
+femm.opendocument('Toyota-Prius-2004.FEM')
 femm.mi_smartmesh(0)
 femm.mi_saveas('temp.fem')
-femm.mi_probdef(0, 'inches', 'planar', 1.e-8, 0.3, 10, 1)
-femm.mi_saveas('temp.fem')
+femm.mi_probdef(0, 'millimeters', 'planar', 1.e-8, 83.6, 15, 1)
 
-# Simulation settings
-RotorMagnets = 16
-n = 361
+# -----------------------------
+# Simulation Parameters
+# -----------------------------
+Npolos = 4
+RotorMagnets = 8
+n = 360
 dk = n / 30
+N = len(iss)
 Nsteps = round(n / dk)
 
-# Initialize storage
-N = len(iss)
+# Initialize arrays
 k_vec = np.zeros(Nsteps)
 Is_vec = np.zeros((N, Nsteps))
 tq = np.zeros(Nsteps)
 Tq = np.zeros((N, Nsteps))
 inic = 0
 
-# FEMM group data placeholder (to be filled during simulation)
-b = A = z = a = g = v = None
-
-# Simulation loop
+# -----------------------------
+# FEMM Simulation Loop
+# -----------------------------
 for i in range(N):
-    Beta = torque_max_angles[iss[i]]  # Optimal beta angle for current (from previous step)
-    ids = -iss[i] * np.sin(np.radians(90 + Beta))
-    iqs =  iss[i] * np.cos(np.radians(90 + Beta))
+    Beta = torque_max_angles[iss[i]]  # Ensure this dict is available beforehand
+
+    ids = -iss[i] * np.sin(np.radians(Beta))
+    iqs =  iss[i] * np.cos(np.radians(Beta))
 
     for j in range(Nsteps):
+        starttime = time.time()
         theta_r = j * dk
         k_vec[j] = theta_r
         Is_vec[i, j] = np.sqrt(ids**2 + iqs**2)
 
-        femm.mi_modifyboundprop('AGE', 10, theta_r)
+        # Update rotor angle
+        femm.mi_modifyboundprop('SlidingBand', 10, theta_r)
 
-        # dq → abc transformation
+        # Park transform dq → abc
         theta_e = (RotorMagnets / 2) * np.radians(theta_r)
-        Id = np.array([np.sin(theta_e - k * 2 * np.pi / 3) for k in range(3)])
-        Iq = np.array([np.cos(theta_e - k * 2 * np.pi / 3) for k in range(3)])
+        Id = np.array([np.sin(theta_e - 2 * k * np.pi / 3) for k in range(3)])
+        Iq = np.array([np.cos(theta_e - 2 * k * np.pi / 3) for k in range(3)])
         Itot = ids * Id + iqs * Iq
 
         femm.mi_setcurrent('A', Itot[0])
         femm.mi_setcurrent('B', Itot[1])
         femm.mi_setcurrent('C', Itot[2])
 
-        starttime = time.time()
         femm.mi_analyze(1)
-        femm.mo_loadsolution()
+        femm.mi_loadsolution()
 
-        tq[j] = femm.mo_gapintegral('AGE', 0)
-        Tq[i, j] = tq[j]
-
-        # Collect mesh data at first step
+        # Collect geometry and allocate on first run
         if inic == 0:
             nn = femm.mo_numelements()
             b = np.zeros((N, Nsteps, nn), dtype=complex)
@@ -102,31 +97,36 @@ for i in range(N):
                 g[m - 1] = elm[6]
         inic = 1
 
-        # Store flux density and vector potential
+        # Store flux data
         for m in range(nn):
             if g[m] > 10:  # Rotor magnet
                 A[i, j, m] = femm.mo_geta(z[m].real, z[m].imag)
-            elif g[m] > 0:  # Stator/rotor iron
+            elif g[m] > 0:  # Iron (stator or rotor)
                 Bxy = femm.mo_getb(z[m].real, z[m].imag)
                 b[i, j, m] = Bxy[0] + 1j * Bxy[1]
 
+        tq[j] = femm.mo_gapintegral('SlidingBand', 0)
+        Tq[i, j] = tq[j]
+
         elapsed_time = time.time() - starttime
-        print(f'Theta_r={theta_r:.2f}°  ::  Current={iss[i]:.2f} A  ::  Beta={Beta:.2f}°  '
-              f'::  {elapsed_time:.2f} s  ::  Torque={tq[j]:.2f} Nm  '
-              f'::  id={ids:.2f}  ::  iq={iqs:.2f}  '
-              f'::  ia={Itot[0]:.2f}, ib={Itot[1]:.2f}, ic={Itot[2]:.2f}')
+        print(f'Theta_r={theta_r:.2f}° :: Corrente={iss[i]:.2f} A :: Beta={Beta:.2f}° '
+              f':: Tempo={elapsed_time:.2f}s :: Torque={tq[j]:.2f} Nm :: '
+              f'id={ids:.2f}, iq={iqs:.2f} :: ia={Itot[0]:.2f}, ib={Itot[1]:.2f}, ic={Itot[2]:.2f}')
     print()
 
-# Retrieve geometry info and compute element volumes
+# -----------------------------
+# Mesh Volume Estimation
+# -----------------------------
 probinfo = femm.mo_getprobleminfo()
-nn = femm.mo_numelements()
-h = probinfo[2]
-unit_scale = probinfo[3]
+h = probinfo[2]            # Depth (mm)
+unit_scale = probinfo[3]   # Conversion to meters
 v = np.zeros(nn)
 for m in range(nn):
-    v[m] = a[m] * h * unit_scale**2
+    v[m] = a[m] * h * unit_scale**2  # [m³]
 
-# Save all data to .mat file
+# -----------------------------
+# Save results to .mat file
+# -----------------------------
 sio.savemat('simulacao_fem.mat', {
     'iss': np.array(iss),
     'k_vec': k_vec,
