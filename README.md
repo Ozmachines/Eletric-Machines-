@@ -6,7 +6,7 @@ The methodology is structured as follows:
 
 **1. Current Definition and Torque Maximization**
 
-* For each current magnitude, the current angle (beta) that maximizes the electromagnetic torque is determined.
+* For each current magnitude the current angle (beta) that maximizes the electromagnetic torque is determined.
 * The corresponding *i<sub>d</sub>* and *i<sub>q</sub>* values are computed and transformed into phase currents (*i<sub>abc</sub>*) using the inverse Park transform.
 
 **2. Magnetostatic FEMM Simulation**
