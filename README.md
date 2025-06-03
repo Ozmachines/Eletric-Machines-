@@ -33,10 +33,10 @@ The methodology is structured as follows:
 
 **5. Efficiency Map Construction**
 
-* For each combination of current and speed:
+* For each combination of torque and speed:
 
   * Input and output powers are determined.
-  * Eletromagnetic torque and overall efficiency are computed.
+  * Eletromagnetic losses and overall efficiency are computed.
   * Results are stored in a 2D matrix forming the efficiency map.
 
 
