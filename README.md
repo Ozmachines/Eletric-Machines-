@@ -1,6 +1,6 @@
 **Summary: Efficiency Map Estimation of Electric Machines**
 
-This work aims to accurately determine the efficiency map of a Permanent Magnet Synchronous Machine (PMSM) using finite element simulations (FEMM) combined with post-processing in Python. The efficiency map represents the machine's performance as a function of electromagnetic torque and rotational speed, enabling evaluation of its operation under various load conditions.
+This work aims to determine the efficiency map of a Permanent Magnet Synchronous Machine (PMSM) using finite element simulations (FEMM) combined with post-processing in Python. The efficiency map represents the machine's performance as a function of electromagnetic torque and rotational speed, enabling evaluation of its operation under various load conditions.
 
 The methodology is structured as follows:
 
