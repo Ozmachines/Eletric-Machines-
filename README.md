@@ -36,7 +36,7 @@ The methodology is structured as follows:
 * For each combination of current and speed:
 
   * Input and output powers are determined.
-  * Mechanical torque and overall efficiency are computed.
+  * Eletromagnetic torque and overall efficiency are computed.
   * Results are stored in a 2D matrix forming the efficiency map.
 
 
