@@ -37,6 +37,6 @@ The methodology is structured as follows:
 
   * Input and output powers are determined.
   * Eletromagnetic losses and overall efficiency are computed.
-  * Results are stored in a 2D matrix forming the efficiency map.
+  * Results are stored in a matrix forming the efficiency map.
 
 
